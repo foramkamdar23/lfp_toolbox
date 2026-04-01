@@ -376,17 +376,17 @@ data_percept_ft = ft_checkdata(data_percept_ft, 'datatype', 'raw', ...
 fprintf('Percept FT structure ready: %d channels x %d samples at %d Hz\n', ...
         nChannels, nSamples, Fs_percept);
 
-
 %% -------------------------------------------------------------------------
 % BLOCK 20 — Define trials from BDF events and epoch Percept LFP
-%            + REMOVE TENS-CONTAMINATED TRIALS
 % -------------------------------------------------------------------------
 
 % --- 20a: Read and correct BioSemi STATUS events --------------------------
+% BioSemi adds 512 (bit 9) to all STATUS values. Masking to 8 bits isolates
+% the trigger byte sent by Psychtoolbox.
 events_raw    = ft_read_event(eegFullPath);
 status_events = events_raw(strcmp({events_raw.type}, 'STATUS'));
 
-% Handle both numeric and string value fields
+% Handle both numeric and string value fields (FieldTrip is inconsistent)
 if ischar(status_events(1).value) || isstring(status_events(1).value)
     raw_values = str2double({status_events.value});
 else
@@ -395,394 +395,29 @@ end
 
 corrected_values = bitand(uint16(raw_values) - 512, 255);
 
-% Print summary
+% Print corrected code summary for inspection
 fprintf('\nCorrected BioSemi event codes:\n');
+fprintf('%-8s  %-8s  %-12s\n', 'Code', 'Count', 'First sample');
+fprintf('%s\n', repmat('-', 1, 35));
 unique_vals = unique(corrected_values);
 for i = 1:length(unique_vals)
     v     = unique_vals(i);
     n     = sum(corrected_values == v);
     first = status_events(find(corrected_values == v, 1)).sample;
-    fprintf('Code %d | Count %d | First sample %d\n', v, n, first);
+    fprintf('%-8d  %-8d  %-12d\n', v, n, first);
 end
 
-% --- Epoch settings -------------------------------------------------------
-PRE_STIM_S  = 0;
-POST_STIM_S = 1.0;
-EPOCH_CODE  = 30;   % image onset
-
-pre_samples  = round(PRE_STIM_S  * Fs_percept);
-post_samples = round(POST_STIM_S * Fs_percept);
-
-Fs_bdf = data.fsample;
-
-% --- Extract event samples ------------------------------------------------
-epoch_events  = status_events(corrected_values == EPOCH_CODE);
-epoch_samples = [epoch_events.sample];
-
-% Convert BDF → Percept sample space
-epoch_samples_ds = round(epoch_samples * (Fs_percept / Fs_bdf));
-
-% --- Build initial trl ----------------------------------------------------
-trl_percept = [];
-
-for k = 1:length(epoch_samples_ds)
-
-    beg = epoch_samples_ds(k) - pre_samples  + lag_samples;
-    en  = epoch_samples_ds(k) + post_samples + lag_samples;
-
-    trl_percept(end+1,:) = [beg, en, -pre_samples, 30]; %#ok<AGROW>
-end
-
-% --- Remove out-of-bounds trials -----------------------------------------
-nSamples = size(data_percept_ft.trial{1}, 2);
-
-valid = trl_percept(:,1) >= 1 & trl_percept(:,2) <= nSamples;
-
-fprintf('%d / %d trials removed (out of bounds)\n', ...
-    sum(~valid), size(trl_percept,1));
-
-trl_percept = trl_percept(valid,:);
-
-%% -------------------------------------------------------------------------
-% 🔥 NEW: REMOVE TENS-CONTAMINATED TRIALS USING ENVELOPE
-% -------------------------------------------------------------------------
-
-threshold = 3;   % tune (2.5–4 works well)
-
-good_trials = true(size(trl_percept,1),1);
-
-for k = 1:size(trl_percept,1)
-
-    beg = trl_percept(k,1);
-    en  = trl_percept(k,2);
-
-    % safety
-    if beg < 1 || en > length(signal_percept_env_aligned)
-        good_trials(k) = false;
-        continue;
-    end
-
-    seg = signal_percept_env_aligned(beg:en);
-
-    % robust detection (better than max)
-    if mean(seg > 2.5) > 0.1   % >10% contaminated
-        good_trials(k) = false;
-    end
-end
-
-fprintf('Removed %d / %d trials due to TENS\n', ...
-    sum(~good_trials), length(good_trials));
-
-trl_percept = trl_percept(good_trials,:);
-
-
-%% -------------------------------------------------------------------------
-% DEBUG: WHICH TRIALS WERE REMOVED
-% -------------------------------------------------------------------------
-
-removed_idx = find(~good_trials);
-kept_idx    = find(good_trials);
-
-fprintf('\n--- TENS REJECTION SUMMARY ---\n');
-fprintf('Total trials: %d\n', length(good_trials));
-fprintf('Kept trials:  %d\n', length(kept_idx));
-fprintf('Removed:      %d\n\n', length(removed_idx));
-
-fprintf('Removed trial indices:\n');
-disp(removed_idx');
-
-%% -------------------------------------------------------------------------
-% Epoch using CLEAN trials
-% -------------------------------------------------------------------------
-
-cfg_epoch     = [];
-cfg_epoch.trl = trl_percept;
-
-data_percept_epoched = ft_redefinetrial(cfg_epoch, data_percept_ft);
-
-% store event code
-data_percept_epoched.trialinfo = trl_percept(:,4);
-
-fprintf('\nFINAL: %d trials after TENS removal\n', ...
-    length(data_percept_epoched.trial));
-
-%% -------------------------------------------------------------------------
-% BLOCK 21 — Visual sanity check: all epochs per channel
-% -------------------------------------------------------------------------
-
-time_ax = data_percept_epoched.time{1};
-nTrials = length(data_percept_epoched.trial);
-nChannels = length(data_percept_epoched.label);
-
-% Use unique trial types (e.g., 30 for image)
-trial_types = unique(data_percept_epoched.trialinfo);
-colors = lines(length(trial_types));
-
-%% --- 21a: Identify NaN-contaminated trials -------------------------------
-nan_trial_mask = false(nTrials, nChannels);
-
-for tr = 1:nTrials
-    for ch = 1:nChannels
-        nan_trial_mask(tr, ch) = any(isnan(data_percept_epoched.trial{tr}(ch, :)));
-    end
-end
-
-% Trial rejected if ANY channel has NaN
-nan_any_ch = any(nan_trial_mask, 2);
-
-n_nan   = sum(nan_any_ch);
-pct_nan = 100 * n_nan / nTrials;
-
-%% --- Print summary -------------------------------------------------------
-fprintf('\n--- NaN trial report ---\n');
-fprintf('Total trials:    %d\n', nTrials);
-fprintf('Trials with NaN: %d (%.1f%%)\n', n_nan, pct_nan);
-fprintf('Clean trials:    %d (%.1f%%)\n', nTrials - n_nan, 100 - pct_nan);
-
-% Per-channel breakdown
-fprintf('\nPer-channel breakdown:\n');
-fprintf('%-20s  %-10s  %s\n', 'Channel', 'NaN trials', '%');
-fprintf('%s\n', repmat('-', 1, 40));
-
-for ch = 1:nChannels
-    n_ch   = sum(nan_trial_mask(:, ch));
-    pct_ch = 100 * n_ch / nTrials;
-
-    fprintf('%-20s  %-10d  %.1f%%\n', ...
-        data_percept_epoched.label{ch}, n_ch, pct_ch);
-end
-
-% Per-condition breakdown
-fprintf('\nPer-condition breakdown:\n');
-fprintf('%-10s  %-10s  %s\n', 'Code', 'NaN trials', '%');
-fprintf('%s\n', repmat('-', 1, 35));
-
-for i = 1:length(trial_types)
-    code = trial_types(i);
-
-    mask     = data_percept_epoched.trialinfo == code;
-    n_code   = sum(nan_any_ch & mask);
-    tot_code = sum(mask);
-
-    fprintf('%-10d  %-10d  %.1f%%\n', ...
-        code, n_code, 100 * n_code / tot_code);
-end
-
-% %% --- 21b: Plot -----------------------------------------------------------
-% figure('Color','w', 'Position', [100 100 1400 900]);
-% 
-% for ch = 1:nChannels
-% 
-%     subplot(ceil(nChannels/2), 2, ch); hold on;
-% 
-%     for tr = 1:nTrials
-% 
-%         code   = data_percept_epoched.trialinfo(tr);
-%         signal = data_percept_epoched.trial{tr}(ch, :);
-% 
-%         color_idx = find(trial_types == code);
-% 
-%         if nan_trial_mask(tr, ch)
-%             % NaN trials → dashed red
-%             plot(time_ax, signal, ...
-%                 'Color', [0.85 0.15 0.15 0.3], ...
-%                 'LineWidth', 0.6, ...
-%                 'LineStyle', '--');
-%         else
-%             % Clean trials → colored by condition
-%             plot(time_ax, signal, ...
-%                 'Color', [colors(color_idx,:), 0.4], ...
-%                 'LineWidth', 0.8);
-%         end
-%     end
-% 
-%     xline(0, 'k--', 'LineWidth', 1.2);
-% 
-%     xlabel('Time (s)');
-%     ylabel('Amplitude (\muV)');
-% 
-%     title(sprintf('%s | NaN: %d/%d', ...
-%         data_percept_epoched.label{ch}, ...
-%         sum(nan_trial_mask(:, ch)), nTrials), ...
-%         'Interpreter', 'none');
-% 
-%     xlim([time_ax(1) time_ax(end)]);
-%     grid on; box off;
-% 
-% end
-% 
-% %% --- Legend --------------------------------------------------------------
-% ax_leg = axes('Position', [0.92 0.3 0.01 0.3], 'Visible', 'off');
-% 
-% for i = 1:length(trial_types)
-%     line(ax_leg, NaN, NaN, ...
-%         'Color', colors(i,:), ...
-%         'LineWidth', 2, ...
-%         'DisplayName', sprintf('Code %d', trial_types(i)));
-% end
-% 
-% line(ax_leg, NaN, NaN, ...
-%     'Color', [0.85 0.15 0.15], ...
-%     'LineWidth', 1.5, ...
-%     'LineStyle', '--', ...
-%     'DisplayName', 'NaN trial');
-% 
-% legend(ax_leg, 'show', 'Location', 'west');
-% 
-% sgtitle(sprintf('All epochs — %d trials | %d NaN (%.1f%%)', ...
-%     nTrials, n_nan, pct_nan), ...
-%     'FontSize', 13, 'FontWeight', 'bold');
-% 
-% %% -------------------------------------------------------------------------
-% % BLOCK 22 — Grand average across all trials and digit positions
-% % -------------------------------------------------------------------------
-% 
-% % --- 22a: Exclude NaN trials ----------------------------------------------
-% clean_trials = find(~nan_any_ch);
-% 
-% cfg_clean        = [];
-% cfg_clean.trials = clean_trials;
-% 
-% data_clean = ft_selectdata(cfg_clean, data_percept_epoched);
-% 
-% % --- 22b: Compute grand average (keep trials to compute SEM) -------------
-% cfg_ga            = [];
-% cfg_ga.trials     = 'all';
-% cfg_ga.keeptrials = 'yes';
-% 
-% grandavg = ft_timelockanalysis(cfg_ga, data_clean);
-% 
-% % --- 22c: Baseline correction (−0.5 to 0 s) ------------------------------
-% cfg_bl          = [];
-% cfg_bl.baseline = [-0.5 0];
-% 
-% grandavg_bl = ft_timelockbaseline(cfg_bl, grandavg);
-% 
-% % Compute mean and SEM manually from the kept trials (nTrials x nChan x nTime)
-% avg_signal = squeeze(mean(grandavg_bl.trial, 1));          % nChan x nTime
-% sem_signal = squeeze(std(grandavg_bl.trial, 0, 1)) ...
-%              ./ sqrt(length(clean_trials));                 % nChan x nTime
-% 
-% % --- 22d: Plot ------------------------------------------------------------
-% time_ax = grandavg_bl.time;
-% 
-% figure('Color','w', 'Position', [100 100 1400 900]);
-% 
-% for ch = 1:nChannels
-% 
-%     subplot(2, 3, ch); hold on;
-% 
-%     sem = sem_signal(ch, :);
-%     avg = avg_signal(ch, :);
-% 
-%     fill([time_ax fliplr(time_ax)], ...
-%          [avg + sem, fliplr(avg - sem)], ...
-%          [0.4 0.6 0.9], 'FaceAlpha', 0.25, 'EdgeColor', 'none');
-% 
-%     plot(time_ax, avg, 'Color', [0.15 0.35 0.75], 'LineWidth', 2);
-% 
-%     xlims = [time_ax(1) time_ax(end)];
-%     yl    = ylim;
-%     fill([-0.5 0 0 -0.5], [yl(1) yl(1) yl(2) yl(2)], ...
-%          [0.85 0.85 0.85], 'FaceAlpha', 0.3, 'EdgeColor', 'none');
-% 
-%     xline(0, 'k--', 'LineWidth', 1.2);
-%     xlabel('Time (s)');
-%     ylabel('\Delta Amplitude (\muV)');
-%     title(sprintf('%s  |  n = %d', grandavg_bl.label{ch}, length(clean_trials)), ...
-%           'Interpreter','none');
-%     xlim(xlims);
-%     grid on; box off;
-% 
-% end
-% 
-% sgtitle(sprintf('Grand average (baselined −0.5–0 s)  |  %d clean trials (%.1f%%)', ...
-%         length(clean_trials), 100*length(clean_trials)/nTrials), ...
-%         'FontSize', 13, 'FontWeight', 'bold');
-% 
-% 
-% 
-% %% -------------------------------------------------------------------------
-% % BLOCK 22 — Grand average (LFP)
-% % -------------------------------------------------------------------------
-% 
-% %% --- 22a: Remove NaN trials ---------------------------------------------
-% clean_trials = find(~nan_any_ch);
-% 
-% cfg = [];
-% cfg.trials = clean_trials;
-% 
-% data_clean = ft_selectdata(cfg, data_percept_epoched);
-% 
-% fprintf('Using %d clean trials (%.1f%%)\n', ...
-%     length(clean_trials), 100*length(clean_trials)/length(nan_any_ch));
-% 
-% %% --- 22b: Timelock (keep trials for SEM) --------------------------------
-% cfg = [];
-% cfg.keeptrials = 'yes';
-% 
-% grandavg = ft_timelockanalysis(cfg, data_clean);
-% 
-% %% --- 22c: Baseline correction -------------------------------------------
-% cfg = [];
-% cfg.baseline = [-1 -0.5];   % adjust if needed
-% 
-% grandavg_bl = ft_timelockbaseline(cfg, grandavg);
-% 
-% %% --- 22d: Compute mean + SEM --------------------------------------------
-% avg_signal = squeeze(mean(grandavg_bl.trial, 1));   % [chan x time]
-% sem_signal = squeeze(std(grandavg_bl.trial, 0, 1)) ...
-%              ./ sqrt(size(grandavg_bl.trial,1));
-% 
-% time_ax   = grandavg_bl.time;
-% nChannels = length(grandavg_bl.label);
-% 
-% %% --- 22e: Plot -----------------------------------------------------------
-% figure('Color','w', 'Position', [100 100 1400 900]);
-% 
-% for ch = 1:nChannels
-% 
-%     subplot(ceil(nChannels/2), 2, ch); hold on;
-% 
-%     avg = avg_signal(ch,:);
-%     sem = sem_signal(ch,:);
-% 
-%     % SEM shading
-%     fill([time_ax fliplr(time_ax)], ...
-%          [avg+sem fliplr(avg-sem)], ...
-%          [0.4 0.6 0.9], ...
-%          'FaceAlpha', 0.25, 'EdgeColor', 'none');
-% 
-%     % Mean signal
-%     plot(time_ax, avg, 'Color', [0.15 0.35 0.75], 'LineWidth', 2);
-% 
-%     % Baseline window shading
-%     yl = ylim;
-%     fill([-0.5 0 0 -0.5], [yl(1) yl(1) yl(2) yl(2)], ...
-%          [0.85 0.85 0.85], ...
-%          'FaceAlpha', 0.3, 'EdgeColor', 'none');
-% 
-%     % Stim onset
-%     xline(0, 'k--', 'LineWidth', 1.2);
-% 
-%     xlabel('Time (s)');
-%     ylabel('\Delta Amplitude (\muV)');
-% 
-%     title(sprintf('%s | n = %d', ...
-%         grandavg_bl.label{ch}, length(clean_trials)), ...
-%         'Interpreter','none');
-% 
-%     xlim([time_ax(1) time_ax(end)]);
-%     grid on; box off;
-% 
-% end
-% 
-% sgtitle(sprintf('Grand average (baseline -0.5–0 s) | %d trials', ...
-%     length(clean_trials)), ...
-%     'FontSize', 13, 'FontWeight', 'bold');
-% 
-% 
 
 
 
-save('lfp_firsthalf2.mat', 'data_percept_epoched');
+% 11 = fixation1
+% 20 = cue
+% 30 = image
+% 40 = rating onset
+% 51–59 = responses
+
+
+PRE_STIM_S  = 1.0;
+POST_STIM_S = 3.0;
+
+EPOCH_CODE = 30;   % image onset

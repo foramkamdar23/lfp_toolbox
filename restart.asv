@@ -1,0 +1,27 @@
+%CPEEG02
+clear all;
+close all;
+clc;
+
+data1 = load("C:\Users\fkamdar\Desktop\repos\data\percept\cp_nonmotor\CPEEG02\ses-01-selected\Report_Json_Session_Report_20260324T124017_firsthalf_1437.mat");
+data2 = load("C:\Users\fkamdar\Desktop\repos\data\percept\cp_nonmotor\CPEEG02\ses-01-selected\Report_Json_Session_Report_20260324T124034_secondhalf_1453.mat");
+
+
+first_half = data1.data.IndefiniteStreaming;
+second_half = data2.data.IndefiniteStreaming;
+
+
+
+
+combined = first_half;
+
+fn = fieldnames(first_half);
+for i = 1:numel(fn)
+    f = fn{i};
+    combined.(f) = [first_half.(f); second_half.(f)];
+end
+
+
+
+
+

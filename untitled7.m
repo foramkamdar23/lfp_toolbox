@@ -3,7 +3,7 @@ clear all;
 close all;
 clc;
 
-load("C:\Users\fkamdar\Desktop\repos\data\percept\cp_nonmotor\CPEEG02\ses-01-selected\Report_Json_Session_Report_20260324T124017_firsthalf_1437.mat");
+load("C:\Users\fkamdar\Desktop\repos\data\percept\cp_nonmotor\CPEEG02\ses-01-selected\Report_Json_Session_Report_20260324T124034_secondhalf_1453.mat");
 
 new_datastruct = data.IndefiniteStreaming;
 
@@ -785,4 +785,14 @@ end
 
 
 
-save('lfp_firsthalf2.mat', 'data_percept_epoched');
+% % Keep only first 48 trials
+% data_percept_epoched.trial = data_percept_epoched.trial(1:48);
+% data_percept_epoched.time  = data_percept_epoched.time(1:48);
+% 
+% % Also trim trialinfo if present
+% if isfield(data_percept_epoched, 'trialinfo')
+%     data_percept_epoched.trialinfo = data_percept_epoched.trialinfo(1:4);
+% end
+
+
+save('lfp_secondhalf2.mat', 'data_percept_epoched');

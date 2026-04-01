@@ -1,366 +1,3 @@
-%% =========================================================================
-%  EEG–PERCEPT SYNCHRONIZATION PIPELINE
-%  TENS artifact alignment using EXG7
-%  =========================================================================
-
-%% -------------------------------------------------------------------------
-% BLOCK 1 — Initialize MATLAB environment
-% -------------------------------------------------------------------------
-clear; close all; clc;
-
-% Add FieldTrip
-addpath(genpath('C:\Users\saosorio\Toolboxes\fieldtrip-20250106'));
-ft_defaults;
-
-%% -------------------------------------------------------------------------
-% BLOCK 2 — Load EEG recording
-% -------------------------------------------------------------------------
-dataDir = 'C:\Users\saosorio\Projects\WorkingMemory_CPEEG';
-eegFile = 'cpeeg01_b02_offstimoffmed_wm.bdf';
-eegFullPath = fullfile(dataDir, eegFile);
-
-cfg = [];
-cfg.dataset = eegFullPath;
-cfg.continuous = 'yes';
-
-data = ft_preprocessing(cfg);
-
-%% -------------------------------------------------------------------------
-% BLOCK 3 — Select EEG + EXG channels
-% -------------------------------------------------------------------------
-cfg = [];
-cfg.channel = ft_channelselection({'EEG*','EXG*'}, data.label);
-
-data_clean = ft_selectdata(cfg, data);
-
-
-%% -------------------------------------------------------------------------
-% BLOCK 4 — Downsample EEG to match Percept sampling rate
-% -------------------------------------------------------------------------
-cfg = [];
-cfg.resamplefs = 250;
-cfg.detrend = 'no';
-
-data_ds = ft_resampledata(cfg, data_clean);
-
-Fs_eeg = data_ds.fsample;
-
-%% -------------------------------------------------------------------------
-% BLOCK 5 — Extract EXG7 channel (contains TENS artifact)
-% -------------------------------------------------------------------------
-channelName = 'EXG7';
-
-cfg = [];
-cfg.channel = channelName;
-
-data_exg = ft_selectdata(cfg, data_ds);
-
-%% -------------------------------------------------------------------------
-% BLOCK 6 — Filter EXG7 and compute envelope
-% -------------------------------------------------------------------------
-cfg = [];
-cfg.bpfilter   = 'yes';
-cfg.bpfreq     = [75 85];
-cfg.bpfilttype = 'but';
-cfg.bpfiltord  = 4;
-
-% Hilbert transform returns the analytic signal envelope
-cfg.hilbert = 'abs';
-
-data_exg_filt = ft_preprocessing(cfg, data_exg);
-
-timeVec_eeg = data_exg_filt.time{1};
-signal_eeg_env = data_exg_filt.trial{1}(1,:);
-
-
-%% -------------------------------------------------------------------------
-% BLOCK 7 — Normalize EEG signal
-% -------------------------------------------------------------------------
-signal_eeg_env = zscore(signal_eeg_env);
-
-%% -------------------------------------------------------------------------
-% BLOCK 8 — Plot filtered EEG artifact
-% -------------------------------------------------------------------------
-figure('Color','w');
-
-plot(timeVec_eeg, signal_eeg_env,'LineWidth',1.2)
-
-xlabel('Time (s)')
-ylabel('Z-scored amplitude')
-title('EXG7 TENS Artifact (Filtered + Envelope)')
-grid on
-
-%% -------------------------------------------------------------------------
-% BLOCK 9 — Load Percept intracranial data
-% -------------------------------------------------------------------------
-load("cpeeg01_block_02_wm_offmed_offstim_percept.mat");
-
-signal_orig = processed_data(1).signal;
-Fs_percept = processed_data(1).fs;
-
-%% -------------------------------------------------------------------------
-% BLOCK 10 — Create synchronization copy and interpolate NaNs
-% -------------------------------------------------------------------------
-signal_sync = signal_orig;
-nanIdx = isnan(signal_sync);
-signal_sync(nanIdx) = interp1( ...
-    find(~nanIdx), ...
-    signal_sync(~nanIdx), ...
-    find(nanIdx), ...
-    'linear','extrap');
-
-%% -------------------------------------------------------------------------
-% BLOCK 11 — Bandpass filter Percept signal
-% -------------------------------------------------------------------------
-lowCut = 75;
-highCut = 85;
-order = 4;
-
-[b,a] = butter(order,[lowCut highCut]/(Fs_percept/2),'bandpass');
-
-signal_percept_filt = filtfilt(b,a,signal_sync);
-
-%% -------------------------------------------------------------------------
-% BLOCK 12 — Compute envelope and normalize Percept signal
-% -------------------------------------------------------------------------
-signal_percept_env = abs(signal_percept_filt);
-signal_percept_env = zscore(signal_percept_env);
-
-
-%% -------------------------------------------------------------------------
-% BLOCK 13 — Visual comparison of signals
-% -------------------------------------------------------------------------
-figure('Color','w')
-
-plot(signal_percept_env,'b')
-hold on
-plot(signal_eeg_env,'r', 'LineWidth',1)
-
-legend('Percept','EEG EXG7')
-title('Z-scored TENS artifacts')
-xlabel('Samples')
-ylabel('Amplitude')
-grid on
-
-%% -------------------------------------------------------------------------
-% BLOCK 14 — Estimate synchronization lag
-% -------------------------------------------------------------------------
-[xc,lags] = xcorr(signal_percept_env,signal_eeg_env);
-xc = xc ./ max(abs(xc));
-[~,idx] = max(xc);
-lag_samples = lags(idx);
-lag_seconds = lag_samples / Fs_percept;
-fprintf('Estimated lag: %d samples (%.3f seconds)\n',lag_samples,lag_seconds)
-
-%% -------------------------------------------------------------------------
-% BLOCK 15 — Plot cross-correlation
-% -------------------------------------------------------------------------
-
-figure('Color','w')
-plot(lags/Fs_percept,xc,'LineWidth',1.2)
-xlabel('Lag (seconds)')
-ylabel('Correlation')
-title('Cross-correlation between Percept and EEG artifacts')
-grid on
-
-%% -------------------------------------------------------------------------
-% BLOCK 16 — Align Percept to EEG using estimated lag
-% -------------------------------------------------------------------------
-% Align both ORIGINAL signal (with NaNs) AND envelope signal
-lag_abs = abs(lag_samples);
-
-if lag_samples > 0
-    % Percept is ahead → shift LEFT
-    signal_percept_aligned     = [signal_orig; nan(lag_abs,1)];
-    signal_percept_env_aligned = [signal_percept_env; nan(lag_abs,1)]; 
-    
-elseif lag_samples < 0
-    % Percept is behind → shift RIGHT
-    signal_percept_aligned     = [nan(lag_abs,1); signal_orig]; 
-    signal_percept_env_aligned = [nan(lag_abs,1); signal_percept_env];
-    
-else
-    % No lag
-    signal_percept_aligned     = signal_orig;
-    signal_percept_env_aligned = signal_percept_env;
-end
-%% -------------------------------------------------------------------------
-% BLOCK 17 — Create common time base
-% -------------------------------------------------------------------------
-t_eeg = (0:length(signal_eeg_env)-1) / Fs_eeg;
-t_percept = (0:length(signal_percept_aligned)-1) / Fs_percept;
-%% -------------------------------------------------------------------------
-% BLOCK 18a — Plot EEG vs Percept envelope (signal_percept_env_aligned)
-% -------------------------------------------------------------------------
-figure('Color','w'); hold on;
-
-% Plot signals first
-plot(t_percept, signal_percept_env_aligned, 'b')
-plot(t_eeg, zscore(signal_eeg_env), 'r', 'LineWidth',1)
-
-% Identify NaN segments (based on original aligned signal)
-nan_mask = isnan(signal_percept_aligned);
-nan_mask = nan_mask(:)';  % ensure row
-d = diff([0 nan_mask 0]);
-nan_start = find(d == 1);
-nan_end   = find(d == -1) - 1;
-
-% Get current y-limits
-yl = ylim;
-
-% Plot NaN patches
-for i = 1:length(nan_start)
-    x_patch = [t_percept(nan_start(i)) t_percept(nan_end(i)) t_percept(nan_end(i)) t_percept(nan_start(i))];
-    y_patch = [yl(1) yl(1) yl(2) yl(2)];
-    patch(x_patch, y_patch, 'k', 'FaceAlpha', 0.5, 'EdgeColor','none');
-end
-
-% Bring signals to top
-plot(t_percept, signal_percept_env_aligned, 'b')
-plot(t_eeg, zscore(signal_eeg_env), 'r', 'LineWidth',1)
-
-legend('Percept envelope','EEG EXG7','Missing Packets')
-xlabel('Time (s)')
-ylabel('Amplitude (z-score)')
-title('Aligned EEG and Percept envelope (NaNs highlighted)')
-grid on
-
-
-%% -------------------------------------------------------------------------
-% BLOCK 18b — Plot EEG vs z-scored original Percept (signal_percept_z)
-% -------------------------------------------------------------------------
-% Compute z-scored aligned Percept signal
-signal_percept_z = (signal_percept_aligned - nanmean(signal_percept_aligned(~isnan(signal_percept_aligned)))) ./ ...
-                   nanstd(signal_percept_aligned(~isnan(signal_percept_aligned)));
-
-figure('Color','w'); hold on;
-
-% Plot signals first
-plot(t_percept, signal_percept_z, 'b')
-plot(t_eeg, zscore(signal_eeg_env), 'r', 'LineWidth',1)
-
-% Get y-limits
-yl = ylim;
-
-% Plot NaN patches
-for i = 1:length(nan_start)
-    x_patch = [t_percept(nan_start(i)) t_percept(nan_end(i)) t_percept(nan_end(i)) t_percept(nan_start(i))];
-    y_patch = [yl(1) yl(1) yl(2) yl(2)];
-    patch(x_patch, y_patch, 'k', 'FaceAlpha', 0.3, 'EdgeColor','none');
-end
-
-% Bring signals to top
-plot(t_percept, signal_percept_z, 'b')
-plot(t_eeg, zscore(signal_eeg_env), 'r', 'LineWidth',1)
-
-legend('NaN segments','Percept (z-scored)','EEG EXG7')
-xlabel('Time (s)')
-ylabel('Amplitude (z-score)')
-title('Aligned EEG and Percept z-scored signal (NaNs highlighted)')
-grid on
-
-%% -------------------------------------------------------------------------
-% BLOCK 19 — Build continuous FieldTrip structure with aligned Percept LFP
-% -------------------------------------------------------------------------
-% Use t_eeg as the time base: it matches the data matrix length exactly,
-% avoiding sampleinfo mismatches in ft_checkdata. The Percept clock is
-% preserved through the lag-shifted trl indices in Block 20.
-
-nChannels = length(processed_data);
-nSamples  = length(t_eeg);             % EEG is the length reference
-
-% --- 19a: Align ALL Percept channels with the lag from Block 14 -----------
-percept_aligned_all = nan(nChannels, nSamples);
-
-for ch = 1:nChannels
-
-    sig_ch = processed_data(ch).signal;     % original signal, NaNs intact
-
-    if lag_samples > 0
-        sig_shifted = [sig_ch; nan(lag_abs, 1)];    % Percept ahead → pad end
-    elseif lag_samples < 0
-        sig_shifted = [nan(lag_abs, 1); sig_ch];    % Percept behind → pad start
-    else
-        sig_shifted = sig_ch;
-    end
-
-    % Trim or pad to exactly nSamples
-    len = length(sig_shifted);
-    if len >= nSamples
-        percept_aligned_all(ch, :) = sig_shifted(1:nSamples);
-    else
-        percept_aligned_all(ch, 1:len) = sig_shifted;
-    end
-
-end
-
-% --- 19b: Channel metadata ------------------------------------------------
-chan_labels = {processed_data.channel}';    % Nx1 cell, e.g. 'ZERO_THREE_LEFT'
-chan_type   = repmat({'lfp'}, nChannels, 1);
-chan_units  = repmat({'uV'},  nChannels, 1);
-
-% --- 19c: Assemble the raw continuous structure ---------------------------
-data_percept_ft              = [];
-data_percept_ft.label        = chan_labels;
-data_percept_ft.fsample      = Fs_percept;          % 250 Hz
-data_percept_ft.trial        = {percept_aligned_all};
-data_percept_ft.time         = {t_eeg};             % length matches data matrix
-data_percept_ft.sampleinfo   = [1, nSamples];
-
-% Header — required by some ft_ functions
-data_percept_ft.hdr.label        = chan_labels;
-data_percept_ft.hdr.chantype     = chan_type;
-data_percept_ft.hdr.chanunit     = chan_units;
-data_percept_ft.hdr.Fs           = Fs_percept;
-data_percept_ft.hdr.nChans       = nChannels;
-data_percept_ft.hdr.nSamples     = nSamples;
-data_percept_ft.hdr.nTrials      = 1;
-data_percept_ft.hdr.nSamplesPre  = 0;
-
-% Percept quality metadata — survives ft_checkdata as a cfg subfield
-data_percept_ft.cfg.percept_gap_info    = {processed_data.gap_info};
-data_percept_ft.cfg.percept_packet_loss = [processed_data.packet_loss_rate];
-data_percept_ft.cfg.percept_bad_packets = {processed_data.bad_packet_indices};
-data_percept_ft.cfg.sync_lag_samples    = lag_samples;
-data_percept_ft.cfg.sync_lag_seconds    = lag_seconds;
-
-% Validate
-data_percept_ft = ft_checkdata(data_percept_ft, 'datatype', 'raw', ...
-                               'feedback', 'yes', 'hassampleinfo', 'yes');
-
-fprintf('Percept FT structure ready: %d channels x %d samples at %d Hz\n', ...
-        nChannels, nSamples, Fs_percept);
-
-%% -------------------------------------------------------------------------
-% BLOCK 20 — Define trials from BDF events and epoch Percept LFP
-% -------------------------------------------------------------------------
-
-% --- 20a: Read and correct BioSemi STATUS events --------------------------
-% BioSemi adds 512 (bit 9) to all STATUS values. Masking to 8 bits isolates
-% the trigger byte sent by Psychtoolbox.
-events_raw    = ft_read_event(eegFullPath);
-status_events = events_raw(strcmp({events_raw.type}, 'STATUS'));
-
-% Handle both numeric and string value fields (FieldTrip is inconsistent)
-if ischar(status_events(1).value) || isstring(status_events(1).value)
-    raw_values = str2double({status_events.value});
-else
-    raw_values = double([status_events.value]);
-end
-
-corrected_values = bitand(raw_values - 512, 255);
-
-% Print corrected code summary for inspection
-fprintf('\nCorrected BioSemi event codes:\n');
-fprintf('%-8s  %-8s  %-12s\n', 'Code', 'Count', 'First sample');
-fprintf('%s\n', repmat('-', 1, 35));
-unique_vals = unique(corrected_values);
-for i = 1:length(unique_vals)
-    v     = unique_vals(i);
-    n     = sum(corrected_values == v);
-    first = status_events(find(corrected_values == v, 1)).sample;
-    fprintf('%-8d  %-8d  %-12d\n', v, n, first);
-end
 
 % --- 20b: Set epoching parameters -----------------------------------------
 PRE_STIM_S  = 1.0;
@@ -579,3 +216,84 @@ end
 sgtitle(sprintf('Grand average (baselined −0.5–0 s)  |  %d clean trials (%.1f%%)', ...
         length(clean_trials), 100*length(clean_trials)/nTrials), ...
         'FontSize', 13, 'FontWeight', 'bold');
+
+
+
+%% -------------------------------------------------------------------------
+% BLOCK 22 — Grand average (LFP)
+% -------------------------------------------------------------------------
+
+%% --- 22a: Remove NaN trials ---------------------------------------------
+clean_trials = find(~nan_any_ch);
+
+cfg = [];
+cfg.trials = clean_trials;
+
+data_clean = ft_selectdata(cfg, data_percept_epoched);
+
+fprintf('Using %d clean trials (%.1f%%)\n', ...
+    length(clean_trials), 100*length(clean_trials)/length(nan_any_ch));
+
+%% --- 22b: Timelock (keep trials for SEM) --------------------------------
+cfg = [];
+cfg.keeptrials = 'yes';
+
+grandavg = ft_timelockanalysis(cfg, data_clean);
+
+%% --- 22c: Baseline correction -------------------------------------------
+cfg = [];
+cfg.baseline = [-0.5 0];   % adjust if needed
+
+grandavg_bl = ft_timelockbaseline(cfg, grandavg);
+
+%% --- 22d: Compute mean + SEM --------------------------------------------
+avg_signal = squeeze(mean(grandavg_bl.trial, 1));   % [chan x time]
+sem_signal = squeeze(std(grandavg_bl.trial, 0, 1)) ...
+             ./ sqrt(size(grandavg_bl.trial,1));
+
+time_ax   = grandavg_bl.time;
+nChannels = length(grandavg_bl.label);
+
+%% --- 22e: Plot -----------------------------------------------------------
+figure('Color','w', 'Position', [100 100 1400 900]);
+
+for ch = 1:nChannels
+
+    subplot(ceil(nChannels/2), 2, ch); hold on;
+
+    avg = avg_signal(ch,:);
+    sem = sem_signal(ch,:);
+
+    % SEM shading
+    fill([time_ax fliplr(time_ax)], ...
+         [avg+sem fliplr(avg-sem)], ...
+         [0.4 0.6 0.9], ...
+         'FaceAlpha', 0.25, 'EdgeColor', 'none');
+
+    % Mean signal
+    plot(time_ax, avg, 'Color', [0.15 0.35 0.75], 'LineWidth', 2);
+
+    % Baseline window shading
+    yl = ylim;
+    fill([-0.5 0 0 -0.5], [yl(1) yl(1) yl(2) yl(2)], ...
+         [0.85 0.85 0.85], ...
+         'FaceAlpha', 0.3, 'EdgeColor', 'none');
+
+    % Stim onset
+    xline(0, 'k--', 'LineWidth', 1.2);
+
+    xlabel('Time (s)');
+    ylabel('\Delta Amplitude (\muV)');
+
+    title(sprintf('%s | n = %d', ...
+        grandavg_bl.label{ch}, length(clean_trials)), ...
+        'Interpreter','none');
+
+    xlim([time_ax(1) time_ax(end)]);
+    grid on; box off;
+
+end
+
+sgtitle(sprintf('Grand average (baseline -0.5–0 s) | %d trials', ...
+    length(clean_trials)), ...
+    'FontSize', 13, 'FontWeight', 'bold');
