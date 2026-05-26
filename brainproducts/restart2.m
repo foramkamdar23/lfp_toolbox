@@ -1,13 +1,13 @@
-%CPEEG02
+%PDNM2_s1
 clear all;
 close all;
 clc;
 
 %% Cell 1
-data1 = load("C:\Users\fkamdar\Desktop\repos\data\percept\cp_nonmotor\CPEEG02\ses-01-selected\Report_Json_Session_Report_20260324T124017_firsthalf_1437.mat");
-data2 = load("C:\Users\fkamdar\Desktop\repos\data\percept\cp_nonmotor\CPEEG02\ses-01-selected\Report_Json_Session_Report_20260324T124034_secondhalf_1453.mat");
-first_half = data1.data.IndefiniteStreaming;
-second_half = data2.data.IndefiniteStreaming;
+data2 = load("C:\Users\fkamdar\Desktop\repos\data\pdnm\pdnm002\session_01\Report_Json_Session_Report_2nd_half.mat");
+data1 = load("C:\Users\fkamdar\Desktop\repos\data\pdnm\pdnm002\session_01\Report_Json_Session_Report_first_half.mat");
+first_half = data1.data.BrainSenseTimeDomain;
+second_half = data2.data.BrainSenseTimeDomain;
 
 %% Cell 2 load lfp
 ch_id = 1;
@@ -33,60 +33,64 @@ subplot(2,1,2); plot(t_lfp2, sig2); title('LFP2');
 addpath('C:\Users\fkamdar\Documents\MATLAB\fieldtrip-20210507');
 ft_defaults;
 
-cfg = [];
-cfg.dataset = 'C:\Users\fkamdar\Desktop\repos\data\eeg-selected\cpeeg02_b01_ert.bdf';
-%cfg.channel = {'EXG7', 'Status'};
-cfg.channel = {'EXG7'};
+vhdr = 'C:\Users\fkamdar\Desktop\repos\data\pdnm\pdnm002\session_01\EEG PC DATA\RAW EEG FILES\PDNM002_04132026_s1_stimV_ON_medON_ERT_b01_1237.vhdr';
+vmrk = 'C:\Users\fkamdar\Desktop\repos\data\pdnm\pdnm002\session_01\EEG PC DATA\RAW EEG FILES\PDNM002_04132026_s1_stimV_ON_medON_ERT_b01_1237.vmrk';
+eeg_data = 'C:\Users\fkamdar\Desktop\repos\data\pdnm\pdnm002\session_01\EEG PC DATA\RAW EEG FILES\PDNM002_04132026_s1_stimV_ON_medON_ERT_b01_1237.eeg';
 
-exg7_data = ft_preprocessing(cfg);
+cfg.dataset = vhdr;  % .vhdr is the header file to start with
+cfg.channel = 'Right Clavicle'; % Replace with your channel name, e.g., 'EOG' or 'EEG001'
+right_clavicle_data = ft_preprocessing(cfg);
 
-exg7_eeg = exg7_data.trial{1};
-t_eeg = exg7_data.time{1};
-fs_eeg = exg7_data.fsample;
+
+right_clavicle_eeg = right_clavicle_data.trial{1};
+t_eeg = right_clavicle_data.time{1};
+fs_eeg = right_clavicle_data.fsample;
 
 figure;
-plot(t_eeg, exg7_eeg);
-title('EXG7');
+plot(t_eeg, right_clavicle_eeg);
+title('Right Clavicle');
 
 % down sampling
-exg7_ds = resample(exg7_eeg, fs_lfp, fs_eeg);
-t_exg7_ds = (0:length(exg7_ds)-1)/fs_lfp;
+right_clavicle_ds = resample(right_clavicle_eeg, fs_lfp, fs_eeg);
+t_right_clavicle_ds = (0:length(right_clavicle_ds)-1)/fs_lfp;
 
 %qc
 figure;
-subplot(2,1,1); plot(t_eeg, exg7_eeg); title('Original EEG');
-subplot(2,1,2); plot(t_exg7_ds, exg7_ds); title('Downsampled EEG (250 Hz)');
+subplot(2,1,1); plot(t_eeg, right_clavicle_eeg); title('Original EEG');
+subplot(2,1,2); plot(t_right_clavicle_ds, right_clavicle_ds); title('Downsampled EEG (250 Hz)');
+
+
 
 
 % filter for enevelope around 80hz tens burst
 [b,a] = butter(4, [75 85]/(fs_lfp/2), 'bandpass');
 
-exg7_ds_filt = filtfilt(b,a, exg7_ds);
+right_clavicle_ds_filt = filtfilt(b,a, right_clavicle_ds);
 lfp1_filt = filtfilt(b,a, sig1);
 lfp2_filt = filtfilt(b,a, sig2);
 
 
 figure;
-subplot(3,1,1); plot(exg7_ds_filt); title('EEG');
+subplot(3,1,1); plot(right_clavicle_ds_filt); title('EEG');
 subplot(3,1,2); plot(lfp1_filt); title('LFP1');
 subplot(3,1,3); plot(lfp2_filt); title('LFP2');
 
 
 %env created and normalized
-exg7_env = abs(hilbert(exg7_ds_filt));
+right_clavicle_env = abs(hilbert(right_clavicle_ds_filt));
 lfp1_env = abs(hilbert(lfp1_filt));
 lfp2_env = abs(hilbert(lfp2_filt));
 
-exg7_env = zscore(exg7_env); %(exg7_env - mean(exg7_env))/std(exg7_env); 
-lfp1_env = zscore(lfp1_env); %(lfp_env - mean(lfp_env))/std(lfp_env);
+right_clavicle_env = zscore(right_clavicle_env); 
+lfp1_env = zscore(lfp1_env); 
 lfp2_env = zscore(lfp2_env); 
 
 %cross correlation
-[xc1, lags1] = xcorr(exg7_env, lfp1_env);
+[xc1, lags1] = xcorr(right_clavicle_env, lfp1_env);
 [~, idx1] = max(xc1); % find peak
 lag_samples1 = lags1(idx1);
 
-[xc2, lags2] = xcorr(exg7_env, lfp2_env);
+[xc2, lags2] = xcorr(right_clavicle_env, lfp2_env);
 [~, idx2] = max(xc2); % find peak
 lag_samples2 = lags2(idx2);
 
@@ -101,7 +105,7 @@ t_lfp1_aligned = t_lfp1 + lag_sec1;
 t_lfp2_aligned = t_lfp2 + lag_sec2;
 
 figure;
-plot(t_exg7_ds, exg7_env); hold on;
+plot(t_right_clavicle_ds, right_clavicle_env); hold on;
 plot(t_lfp1_aligned, lfp1_env); hold on;
 plot(t_lfp2_aligned, lfp2_env);
 legend('EEG ENV','LFP ENV (aligned)');
@@ -110,7 +114,7 @@ fprintf("done with alinging")
 
 %% Combine LFP1 & LPF2
 
-t_master = t_exg7_ds;
+t_master = t_right_clavicle_ds;
 lfp_merged = nan(size(t_master)); % master timeline
 
 
@@ -124,7 +128,7 @@ valid2 = sample_idx2 > 0 & sample_idx2 <= length(lfp_merged);
 lfp_merged(sample_idx2(valid2)) = sig2(valid2);
 
 figure;
-plot(t_master, exg7_ds_filt); hold on;
+plot(t_master, right_clavicle_ds_filt); hold on;
 plot(t_master, lfp_merged);
 legend('EEG','Merged LFP');
 
@@ -151,18 +155,18 @@ end
 legend('LFP','NaN regions');
 title('Merged LFP with NaN gaps');
 
-%% Biosemi Triggers
+%% BRAIN PRODUCTS Triggers
 
 % Lets look into the triggers now
-events = ft_read_event('C:\Users\fkamdar\Desktop\repos\data\eeg-selected\cpeeg02_b01_ert.bdf');
-events(1:3) = [];
+events = ft_read_event(vhdr);
+events(1:1) = [];
 trig = [events.value]'; 
 trig = trig-512;
 trig = double(bitand(int32(trig),255)); % we have triggers now
 
 % lets do time of the triggers
 trig_samples = [events.sample]';
-trig_time = trig_samples / exg7_data.hdr.Fs;
+trig_time = trig_samples / right_clavicle_data.hdr.Fs;
 
 trig_table = table(trig,trig_time, 'VariableNames', {'TriggerCode', 'TriggerTime'});
 trig_table = trig_table(trig_table.TriggerCode ~= 0, :);
@@ -280,8 +284,8 @@ fprintf("FieldTrip structure created\n");
 image_idx = trig_table.Event == "image";
 image_samples = round(trig_table.TriggerTime(image_idx) * fs_lfp);
 
-pre  = round(0.5 * fs_lfp);
-post = round(3.5 * fs_lfp);
+pre  = round(4 * fs_lfp);
+post = round(5 * fs_lfp);
 
 trl = [];
 
@@ -495,11 +499,11 @@ tone_idx = strcmp(trial_info_clean.Condition, 'TONE');
 
 cfg = [];
 cfg.trials = find(feel_idx);
-data_feel = ft_selectdata(cfg, data_bl);
+data_feel = ft_selectdata(cfg, data_clean);
 
 cfg = [];
 cfg.trials = find(tone_idx);
-data_tone = ft_selectdata(cfg, data_bl);
+data_tone = ft_selectdata(cfg, data_clean);
 
 % VALENCE (NEG / NEU / POS) 
 trial_info.Valence = string(csv_data.Valence_group);
@@ -511,15 +515,15 @@ neg_idx = strcmp(trial_info_clean.Valence, 'Neg');
 
 cfg = [];
 cfg.trials = find(pos_idx);
-data_pos = ft_selectdata(cfg, data_bl);
+data_pos = ft_selectdata(cfg, data_clean);
 
 cfg = [];
 cfg.trials = find(neu_idx);
-data_neu = ft_selectdata(cfg, data_bl);
+data_neu = ft_selectdata(cfg, data_clean);
 
 cfg = [];
 cfg.trials = find(neg_idx);
-data_neg = ft_selectdata(cfg, data_bl);
+data_neg = ft_selectdata(cfg, data_clean);
 
 %% PLOT MEAN 
 cfg = [];
@@ -547,8 +551,6 @@ for ch = 1:n_ch
 end
 
 legend('FEEL','TONE');
-
-
 
 
 %%
@@ -582,20 +584,5 @@ end
 
 legend('NEG','NEU','POS');
 
-%% TFR
+%close all;
 
-cfg = [];
-cfg.channel = 'all';      % or pick specific channel like {'ONE_THREE_RIGHT'}
-cfg.method  = 'wavelet';
-cfg.width   = 6;
-cfg.output  = 'pow';
-
-cfg.foi = 2:1:100;        % match your earlier range
-cfg.toi = -0.5:0.05:3.5;
-
-%cfg.keeptrials = 'yes';
-
-freq_feel = ft_freqanalysis(cfg, data_feel);
-freq_tone = ft_freqanalysis(cfg, data_tone);
-
-% 

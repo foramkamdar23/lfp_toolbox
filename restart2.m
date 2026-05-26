@@ -546,7 +546,7 @@ for ch = 1:n_ch
     ylabel('LFP');
 end
 
-legend('FEEL','TONE');
+legend('Perception','Regulation');
 
 
 %%
@@ -580,57 +580,5 @@ end
 
 legend('NEG','NEU','POS');
 
-%% TFR
-cfg = [];
-cfg.method = 'wavelet';
-cfg.output = 'pow';
-cfg.width  = 6;
-cfg.foi = 2:1:100;
-cfg.toi = -0.5:0.05:3;
+%close all;
 
-cfg.keeptrials = 'yes';
-
-freq_clean = ft_freqanalysis(cfg, data_clean);
-
-%baseline
-cfg = [];
-cfg.baseline = [-0.5 -0.2];
-cfg.baselinetype = 'relchange';   % or 'db'
-freq_clean_bl = ft_freqbaseline(cfg, freq_clean);
-
-%avg
-cfg = [];
-cfg.avgoverrpt = 'yes';
-
-freq_avg = ft_selectdata(cfg, freq_clean_bl);
-
-n_ch = length(freq_avg.label);
-
-%plot
-figure;
-for ch = 1:n_ch
-    
-    subplot(ceil(n_ch/2), 2, ch);
-    
-    imagesc(freq_avg.time, freq_avg.freq, ...
-        squeeze(freq_avg.powspctrm(ch,:,:)), [-2 2]); 
-    
-    axis xy;
-    title(freq_avg.label{ch});
-    
-    xline(0,'w--');
-    colorbar;
-
-    colormap jet
-end
-
-xlabel('Time (s)');
-ylabel('Frequency (Hz)');
-
-
-data = freq_avg.powspctrm;
-
-neg_vals = data(data < 0);
-length(neg_vals)
-pos_vals = data(data > 0);
-length(pos_vals)
