@@ -2,7 +2,7 @@ clear;
 clc;
 
 %% ========== CONFIG ==========
-rootDir = 'C:\Users\fkamdar\Desktop\repos\data\pdnm\pdnm064\session03';
+rootDir = 'C:\Users\fkamdar\Desktop\repos\data\cp\sub-cpeeg02\ses-02-selected\ieeg';
 skipIfExists = true;
 %% ============================
 
