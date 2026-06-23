@@ -3,7 +3,7 @@ clear all;
 close all;
 clc;
 %% Cell 1
-data2 = load("C:\Users\fkamdar\Desktop\repos\data\pdnm\pdnm064\session03\Report_Json_Session_Report_20260424T170420.mat");
+data2 = load("C:\Users\fkamdar\Desktop\repos\data\Report_Json_Session_Report_20260618T132944.mat");
 brainsense = data2.data.BrainSenseTimeDomain;
 indefinite = data2.data.IndefiniteStreaming;
 %% Cell 2 load and filter lfp across channels
@@ -43,7 +43,7 @@ for ch = 1:n_indef
 
     t_lfp2{ch} = (0:length(sig2{ch})-1)/fs_indef;
 
-    [b,a] = butter(4, [75 85]/(fs_indef/2), 'bandpass');
+    [b,a] = butter(4, [78 82]/(fs_indef/2), 'bandpass');
     lfp2_filt{ch} = filtfilt(b,a, sig2{ch});
 
     figure;

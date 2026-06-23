@@ -57,7 +57,7 @@ psd_data = ft_selectdata(cfg, freq_clean_bl); % Use freq_clean for raw power
 
 % 2. Plotting
 
-n_ch = 6;
+n_ch = 2;
 for ch = 1:n_ch
     %subplot(ceil(n_ch/2), 2, ch);
     

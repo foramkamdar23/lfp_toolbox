@@ -1,8 +1,12 @@
-load("C:\Users\fkamdar\Desktop\repos\lfp_toolbox\derivatives\sub-CPEEG02_ses-01_data_clean.mat")
+% Plot layout: left column = LEFT hemisphere, right column = RIGHT.
+clear all;
+clc;
+
+load("C:\Users\fkamdar\Desktop\repos\lfp_toolbox\derivatives\sub-CPEEG01_ses-02_data_clean.mat")
 
 % Plot layout: left column = LEFT hemisphere, right column = RIGHT.
-plot_layout = { 'ONE_THREE_LEFT', 'ONE_THREE_RIGHT'; ...
-                'ZERO_TWO_LEFT',  'ZERO_TWO_RIGHT' };
+plot_layout = { 'ZERO_TWO_LEFT',  'ZERO_TWO_RIGHT' ...
+                 'ZERO_TWO_LEFT', 'ZERO_TWO_RIGHT'};
  
 fprintf('Loaded %d clean trials, channels: %s\n', ...
         numel(data_clean.trial), strjoin(data_clean.label, ', '));
@@ -39,27 +43,6 @@ plot_tfr_grid(freq_avg, plot_layout, tfr_clim, ...
  
 
 
-function plot_tfr_grid(freq, layout, clim, ttl)
-    % Per-channel TFR grid (LEFT col = left hemisphere, RIGHT col = right).
-    % freq.powspctrm is [channels x freq x time] after averaging over trials.
-    [nr, nc] = size(layout);
-    figure('Name', ttl);
-    for r = 1:nr
-        for c = 1:nc
-            lab = layout{r,c};
-            ch = find(strcmp(freq.label, lab), 1);
-            subplot(nr, nc, (r-1)*nc + c);
-            imagesc(freq.time, freq.freq, squeeze(freq.powspctrm(ch,:,:)), clim);
-            axis xy;
-            xline(0, 'k--');                 % image onset
-            title(lab, 'Interpreter', 'none');
-            xlabel('Time (s)'); ylabel('Frequency (Hz)');
-            colorbar;
-        end
-    end
-    colormap jet
-    sgtitle(ttl);
-end
 
 
 %% PSD for all trials of 1 channel:
@@ -87,10 +70,9 @@ psd_twin = [0 3];     % s, time window to average over
 f = freq_clean_bl.freq;
 t_idx = freq_clean_bl.time >= psd_twin(1) & freq_clean_bl.time <= psd_twin(2);
 
-plot_layout = { 'ONE_THREE_LEFT', 'ONE_THREE_RIGHT'; ...
-                'ZERO_TWO_LEFT',  'ZERO_TWO_RIGHT' };
+plot_layout = {'ZERO_TWO_LEFT',  'ZERO_TWO_RIGHT' };
 [nr, nc] = size(plot_layout);
-
+cond_colors_light = {[0.7 0.8 1.0], [1.0 0.7 0.7]}; 
 figure;
 for r = 1:nr
     for c = 1:nc
@@ -110,7 +92,7 @@ for r = 1:nr
         
         fill([f(:)' fliplr(f(:)')], ...
             [upper_bound(:)' fliplr(lower_bound(:)')], ...
-            cond_colors_light{k}, 'EdgeColor', 'none', 'FaceAlpha', 0.3 );  
+            cond_colors_light{c}, 'EdgeColor', 'none', 'FaceAlpha', 0.3 );  
 
         % plot(f, upper_bound, 'Color', [0.9 0.9 0.9], 'LineWidth', 1, 'LineStyle', '-');
         % plot(f, lower_bound, 'Color', [0.9 0.9 0.9], 'LineWidth', 1, 'LineStyle', '-');
@@ -132,9 +114,9 @@ neu_idx = strcmp(trial_info_clean.Valence, 'Neu');
 neg_idx = strcmp(trial_info_clean.Valence, 'Neg');
 
 
-cfg = [];
-cfg.trials = find(feel_idx);
-data_feel = ft_selectdata(cfg, data_clean);
+% cfg = [];
+% cfg.trials = find(feel_idx);
+% data_feel = ft_selectdata(cfg, data_clean);
 
 %% PSD per condition (FEEL vs TONE)
 psd_twin = [0 3];
@@ -144,8 +126,10 @@ t_idx = freq_clean_bl.time >= psd_twin(1) & freq_clean_bl.time <= psd_twin(2);
 feel_idx = strcmp(trial_info_clean.Condition, 'FEEL');
 tone_idx = strcmp(trial_info_clean.Condition, 'TONE');
 
-plot_layout = { 'ONE_THREE_LEFT', 'ONE_THREE_RIGHT'; ...
-                'ZERO_TWO_LEFT',  'ZERO_TWO_RIGHT' };
+% plot_layout = { 'ONE_THREE_LEFT', 'ONE_THREE_RIGHT'; ...
+%                 'ZERO_TWO_LEFT',  'ZERO_TWO_RIGHT' };
+
+plot_layout = {'ZERO_TWO_LEFT',  'ZERO_TWO_RIGHT' };
 
 conditions  = {feel_idx, tone_idx};
 cond_names  = {'FEEL', 'TONE'};
@@ -205,8 +189,8 @@ neg_idx = strcmp(trial_info_clean.Valence, 'Neg');
 neu_idx = strcmp(trial_info_clean.Valence, 'Neu');
 pos_idx = strcmp(trial_info_clean.Valence, 'Pos');
 
-plot_layout = { 'ONE_THREE_LEFT', 'ONE_THREE_RIGHT'; ...
-                'ZERO_TWO_LEFT',  'ZERO_TWO_RIGHT' };
+plot_layout = {'ZERO_TWO_LEFT',  'ZERO_TWO_RIGHT' };
+
 
 conditions  = {neg_idx, neu_idx, pos_idx};
 cond_names  = {'Neg', 'Neu', 'Pos'};
@@ -261,8 +245,7 @@ neg_idx  = strcmp(trial_info_clean.Valence, 'Neg');
 neu_idx  = strcmp(trial_info_clean.Valence, 'Neu');
 pos_idx  = strcmp(trial_info_clean.Valence, 'Pos');
 
-plot_layout = { 'ONE_THREE_LEFT', 'ONE_THREE_RIGHT'; ...
-                'ZERO_TWO_LEFT',  'ZERO_TWO_RIGHT' };
+plot_layout = { 'ZERO_TWO_LEFT',  'ZERO_TWO_RIGHT' };
 
 cond_names  = {'Neg', 'Neu', 'Pos'};
 cond_colors       = {[0.8 0.1 0.1], [0.4 0.4 0.4], [0.1 0.6 0.2]};
@@ -329,8 +312,7 @@ neg_idx  = strcmp(trial_info_clean.Valence, 'Neg');
 neu_idx  = strcmp(trial_info_clean.Valence, 'Neu');
 pos_idx  = strcmp(trial_info_clean.Valence, 'Pos');
 
-channels = { 'ONE_THREE_LEFT', 'ONE_THREE_RIGHT'; ...
-             'ZERO_TWO_LEFT',  'ZERO_TWO_RIGHT'  };
+channels = { 'ZERO_TWO_LEFT',  'ZERO_TWO_RIGHT'  };
 
 main_conditions = {feel_idx, tone_idx};
 main_names      = {'FEEL', 'TONE'};

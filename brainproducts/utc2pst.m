@@ -2,7 +2,7 @@
 clear all;
 clc;
 
-folder = "C:\Users\fkamdar\Desktop\repos\data\cp\sub-cpeeg02\ses-02-selected\ieeg";
+folder = 'C:\Users\fkamdar\Desktop\repos\data\ok_new_cp';
 files = dir(fullfile(folder, "*.mat"));
 
 for i = 1:length(files)

@@ -4,8 +4,8 @@ close all;
 clc;
 
 %% Cell 1
-data2 = load("C:\Users\fkamdar\Desktop\repos\data\pdnm\pdnm002\session_01\Report_Json_Session_Report_2nd_half.mat");
-data1 = load("C:\Users\fkamdar\Desktop\repos\data\pdnm\pdnm002\session_01\Report_Json_Session_Report_first_half.mat");
+data2 = load("C:\Users\fkamdar\Desktop\repos\data\pdnm\pdnm091\session02\Report_Json_Session_Report_1254.mat");
+data1 = load("C:\Users\fkamdar\Desktop\repos\data\pdnm\pdnm091\session02\Report_Json_Session_Report_1200.mat");
 first_half = data1.data.BrainSenseTimeDomain;
 second_half = data2.data.BrainSenseTimeDomain;
 
@@ -17,7 +17,7 @@ second_half_ch1 = second_half(ch_id);
 
 sig1 = first_half_ch1.TimeDomainData;
 sig2 = second_half_ch1.TimeDomainData;
-fs_lfp = first_half_ch1.SampleRateInHz;
+fs_lfp = second_half_ch1.SampleRateInHz;
 
 t_lfp1 = (0:length(sig1)-1)/fs_lfp;
 t_lfp2  = (0:length(sig2)-1)/fs_lfp;

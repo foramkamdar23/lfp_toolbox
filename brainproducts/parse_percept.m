@@ -4,7 +4,7 @@ clear all;
 clc;
 close all;
 
-filepath = "C:\Users\fkamdar\Desktop\repos\data\percept\Report_Json_Session_Report_20260326T103859.mat";
+filepath = "C:\Users\fkamdar\Desktop\repos\data\pdnm\pdnm064\session02\Report_Json_Session_Report_1201.mat";
 load(filepath)
 
 %% Run once to get the info below
@@ -23,7 +23,7 @@ end
 %%
 %% Lets do one channel at a time ( out of the 6)
 ch_id = 1; 
-is = data.IndefiniteStreaming(ch_id);   % choose channel
+bs = data.IndefiniteStreaming(ch_id);   % choose channel
 
 
 

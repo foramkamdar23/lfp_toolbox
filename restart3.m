@@ -16,9 +16,9 @@ addpath(fieldtrip_path);
 ft_defaults;
 
 %% ===================== LOAD PERCEPT LFP =====================
-lfp_first_file  = "C:\Users\fkamdar\Desktop\repos\data\percept\cp_nonmotor\CPEEG02\ses-01-selected\Report_Json_Session_Report_20260324T124017_firsthalf_1437.mat";
-lfp_second_file = "C:\Users\fkamdar\Desktop\repos\data\percept\cp_nonmotor\CPEEG02\ses-01-selected\Report_Json_Session_Report_20260324T124034_secondhalf_1453.mat";
-n_lfp_channels  = 6;                 % Percept IndefiniteStreaming channels per file
+lfp_first_file  = "C:\Users\fkamdar\Desktop\repos\data\cp\sub-cpeeg02\ses-01-selected\ieeg\Report_Json_Session_Report_1209.mat";
+lfp_second_file = "C:\Users\fkamdar\Desktop\repos\data\cp\sub-cpeeg02\ses-01-selected\ieeg\Report_Json_Session_Report_1226.mat";
+n_lfp_channels  = 2;                 % Percept IndefiniteStreaming channels per file
 align_channel   = "ONE_THREE_LEFT";  % channel used to estimate the alignment lag
 
 data1 = load(lfp_first_file);
@@ -418,7 +418,7 @@ function plot_avg_overlay(avgs, colors, names, layout, ttl)
 end
 
 
-subject = 'CPEEG02';  session = 'ses-01';
+subject = 'CPEEG01';  session = 'ses-02';
 deriv_root = 'C:\Users\fkamdar\Desktop\repos\lfp_toolbox\derivatives';
 if ~exist(deriv_root, 'dir'); mkdir(deriv_root); end
 save(fullfile(deriv_root, sprintf('sub-%s_%s_data_clean.mat', subject, session)), ...

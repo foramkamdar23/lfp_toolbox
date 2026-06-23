@@ -1,13 +1,15 @@
-%CPEEG02
+%CPEEG02 session 2
 clear all;
 close all;
 clc;
 
 %% Cell 1
-data1 = load("C:\Users\fkamdar\Desktop\repos\data\percept\cp_nonmotor\CPEEG02\ses-01-selected\Report_Json_Session_Report_20260324T124017_firsthalf_1437.mat");
-data2 = load("C:\Users\fkamdar\Desktop\repos\data\percept\cp_nonmotor\CPEEG02\ses-01-selected\Report_Json_Session_Report_20260324T124034_secondhalf_1453.mat");
-first_half = data1.data.IndefiniteStreaming;
-second_half = data2.data.IndefiniteStreaming;
+lfp_first_file  = "C:\Users\fkamdar\Desktop\repos\data\ok_new_cp\cpeeg01_ses02_ert1_11_39.mat";
+lfp_second_file = "C:\Users\fkamdar\Desktop\repos\data\ok_new_cp\cpeeg01_ses02_ert2_11_54.mat";
+data1 = load(lfp_first_file);
+data2 = load(lfp_second_file );
+first_half = data1.data.BrainSenseTimeDomain;
+second_half = data2.data.BrainSenseTimeDomain;
 
 %% Cell 2 load lfp
 
@@ -35,7 +37,7 @@ addpath('C:\Users\fkamdar\Documents\MATLAB\fieldtrip-20210507');
 ft_defaults;
 
 cfg = [];
-cfg.dataset = 'C:\Users\fkamdar\Desktop\repos\data\eeg-selected\cpeeg02_b01_ert.bdf';
+cfg.dataset = 'C:\Users\fkamdar\Desktop\repos\data\ok_new_cp\cpeeg01_ses02_ert_b03.bdf';
 %cfg.channel = {'EXG7', 'Status'};
 cfg.channel = {'EXG7'};
 
@@ -60,7 +62,7 @@ subplot(2,1,2); plot(t_exg7_ds, exg7_ds); title('Downsampled EEG (250 Hz)');
 
 
 % filter for enevelope around 80hz tens burst
-[b,a] = butter(4, [75 85]/(fs_lfp/2), 'bandpass');
+[b,a] = butter(4, [78 82]/(fs_lfp/2), 'bandpass');
 
 exg7_ds_filt = filtfilt(b,a, exg7_ds);
 lfp1_filt = filtfilt(b,a, sig1);

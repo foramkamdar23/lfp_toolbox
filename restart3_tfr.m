@@ -3,11 +3,11 @@ fieldtrip_path = "C:\Users\fkamdar\Documents\MATLAB\fieldtrip-20210507";
 addpath(fieldtrip_path);
 ft_defaults;
 
-load("C:\Users\fkamdar\Desktop\repos\lfp_toolbox\derivatives\sub-CPEEG02_ses-01_data_clean.mat")
+load("C:\Users\fkamdar\Desktop\repos\lfp_toolbox\derivatives\sub-CPEEG01_ses-02_data_clean.mat")
 
 % Plot layout: left column = LEFT hemisphere, right column = RIGHT.
-plot_layout = { 'ONE_THREE_LEFT', 'ONE_THREE_RIGHT'; ...
-                'ZERO_TWO_LEFT',  'ZERO_TWO_RIGHT' };
+plot_layout = { 'ZERO_TWO_LEFT',  'ZERO_TWO_RIGHT' ...
+                 'ZERO_TWO_LEFT', 'ZERO_TWO_RIGHT'};
  
 fprintf('Loaded %d clean trials, channels: %s\n', ...
         numel(data_clean.trial), strjoin(data_clean.label, ', '));
@@ -44,28 +44,28 @@ plot_tfr_grid(freq_avg, plot_layout, tfr_clim, ...
  
 
 
-function plot_tfr_grid(freq, layout, clim, ttl)
-    % Per-channel TFR grid (LEFT col = left hemisphere, RIGHT col = right).
-    % freq.powspctrm is [channels x freq x time] after averaging over trials.
-    [nr, nc] = size(layout);
-    figure('Name', ttl);
-    for r = 1:nr
-        for c = 1:nc
-            lab = layout{r,c};
-            ch = find(strcmp(freq.label, lab), 1);
-            subplot(nr, nc, (r-1)*nc + c);
-            imagesc(freq.time, freq.freq, squeeze(freq.powspctrm(ch,:,:)), clim);
-            axis xy;
-            xline(0, 'k--');                 % image onset
-            title(lab, 'Interpreter', 'none');
-            xlabel('Time (s)'); ylabel('Frequency (Hz)');
-            colorbar;
-        end
-    end
-    colormap jet
-    sgtitle(ttl);
-end
-
+% function plot_tfr_grid(freq, layout, clim, ttl)
+%     % Per-channel TFR grid (LEFT col = left hemisphere, RIGHT col = right).
+%     % freq.powspctrm is [channels x freq x time] after averaging over trials.
+%     [nr, nc] = size(layout);
+%     figure('Name', ttl);
+%     for r = 1:nr
+%         for c = 1:nc
+%             lab = layout{r,c};
+%             ch = find(strcmp(freq.label, lab), 1);
+%             subplot(nr, nc, (r-1)*nc + c);
+%             imagesc(freq.time, freq.freq, squeeze(freq.powspctrm(ch,:,:)), clim);
+%             axis xy;
+%             xline(0, 'k--');                 % image onset
+%             title(lab, 'Interpreter', 'none');
+%             xlabel('Time (s)'); ylabel('Frequency (Hz)');
+%             colorbar;
+%         end
+%     end
+%     colormap jet
+%     sgtitle(ttl);
+% end
+% 
 
 
 %% TFR by valence group (Neg / Neu / Pos)
@@ -100,8 +100,7 @@ pos_idx = strcmp(trial_info_clean.Valence, 'Pos');
 valence_idx   = {neg_idx,  neu_idx,  pos_idx};
 valence_names = {'Neg',    'Neu',    'Pos'};
 
-channels = { 'ONE_THREE_LEFT', 'ONE_THREE_RIGHT'; ...
-             'ZERO_TWO_LEFT',  'ZERO_TWO_RIGHT'  };
+channels = {'ZERO_TWO_LEFT',  'ZERO_TWO_RIGHT'  };
 
 % pre-compute per-valence averages once
 freq_val_avg = cell(3,1);
@@ -148,8 +147,7 @@ pos_idx = strcmp(trial_info_clean.Valence, 'Pos');
 valence_idx   = {neg_idx,  neu_idx,  pos_idx};
 valence_names = {'Neg',    'Neu',    'Pos'};
 
-channels = { 'ONE_THREE_LEFT', 'ONE_THREE_RIGHT'; ...
-             'ZERO_TWO_LEFT',  'ZERO_TWO_RIGHT'  };
+channels = { 'ZERO_TWO_LEFT',  'ZERO_TWO_RIGHT'  };
 
 % pre-compute per-valence averages once
 freq_val_avg = cell(3,1);
@@ -207,8 +205,7 @@ valence_names = {'Neg',    'Neu',    'Pos'};
 main_conditions = {feel_idx, tone_idx};
 main_names      = {'FEEL',   'TONE'};
 
-channels = { 'ONE_THREE_LEFT', 'ONE_THREE_RIGHT'; ...
-             'ZERO_TWO_LEFT',  'ZERO_TWO_RIGHT'  };
+channels = { 'ZERO_TWO_LEFT',  'ZERO_TWO_RIGHT'  };
 
 % pre-compute per-condition x valence averages once
 % freq_val_avg{m,v}: condition m, valence v
