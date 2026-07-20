@@ -243,7 +243,8 @@ fprintf('QC flags (advisory): %d TENS, %d NaN, %d total flagged\n', ...
         sum(tens_bad), sum(nan_bad), sum(qc_flag));
 
 %% ===================== ATTACH LABELS FROM CURATED CSV =====================
-labels_csv      = "C:\Users\fkamdar\Desktop\repos\lfp_toolbox\cpeeg02_block_96.csv";
+%labels_csv      = "C:\Users\fkamdar\Desktop\repos\lfp_toolbox\cpeeg02_block_96.csv";
+labels_csv      = "C:\Users\fkamdar\Desktop\repos\lfp_toolbox\cpeeg02ses01\cpeeg02_block_96_neu4-6.csv"
 csv_trialid_col = "trial";          % column holding the original 1..96 trial number
 csv_cond_col    = "condition";
 csv_val_col     = "Valence_group";
@@ -348,5 +349,5 @@ plot_avg_overlay({avg_neg, avg_neu, avg_pos}, {'r','g','b'}, ...
 subject = 'CPEEG02';  session = 'ses-01';
 deriv_root = 'C:\Users\fkamdar\Desktop\repos\lfp_toolbox\derivatives';
 if ~exist(deriv_root, 'dir'); mkdir(deriv_root); end
-save(fullfile(deriv_root, sprintf('sub-%s_%s_data_clean.mat', subject, session)), ...
+save(fullfile(deriv_root, sprintf('sub-%s_%s_data_clean_neu4-6.mat', subject, session)), ...
      'data_clean', 'trial_info_clean', '-v7.3');

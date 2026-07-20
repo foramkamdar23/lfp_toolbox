@@ -19,8 +19,8 @@ function plot_tfr_grid(freq, layout, clim, ttl, label_map)
                 plot_title = lab;
             end
             title(plot_title, 'Interpreter', 'none');
-
-            xlabel('Time (s)'); ylabel('Frequency (Hz)');
+            yticks([2 4 8 16 29]);
+            xlabel('Time (s)'); ylabel('Log Frequency');
             colorbar;
         end
     end
